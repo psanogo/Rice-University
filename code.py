@@ -1,107 +1,115 @@
 """
-Project for Week 4 of "Python Programming Essentials".
-This script contains functions to calculate information about dates.
+This module provides functions for comparing two text files line by line
+and formatting their differences.
 """
 
-def is_leap(year):
+def get_file_lines(filename):
     """
-    Helper function to determine if a year is a leap year.
-    A year is a leap year if it is divisible by 4,
-    except for end-of-century years, which must be divisible by 400.
-    """
-    return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+    Reads a file and returns its lines as a list of strings.
+    Each line is stripped of its trailing newline character.
 
-def days_in_month(year, month):
-    """
-    Takes a year and a month as input and returns the number of days in
-    that month. It correctly handles leap years for February.
-    """
-    if month == 2:
-        if is_leap(year):
-            return 29
-        else:
-            return 28
-    elif month in [4, 6, 9, 11]:
-        return 30
-    else:
-        return 31
+    Args:
+        filename (str): The path to the file.
 
-def is_valid_date(year, month, day):
+    Returns:
+        list: A list of strings, where each string is a line from the file.
+              Returns an empty list if the file cannot be found or read.
     """
-    Takes a year, month, and day as input and returns True if the date is valid,
-    and False otherwise.
+    try:
+        # 'with open' ensures the file is automatically closed even if errors occur.
+        with open(filename, 'r', encoding='utf-8') as file_handle:
+            # Read all lines into a list and strip the trailing newline from each.
+            lines = [line.rstrip('\n') for line in file_handle.readlines()]
+            return lines
+    except (FileNotFoundError, IOError):
+        # It's often fine to catch multiple related exceptions together.
+        return []
+
+def singleline_diff(line1, line2):
     """
-    # Check if types are integers, breaking the line for style
-    if not (isinstance(year, int) and isinstance(month, int) and
-            isinstance(day, int)):
-        return False
-        
-    # Check if year and month are within a valid range (1-9999 for year).
-    # This fixes the bug with year 12000.
-    if not (1 <= year <= 9999 and 1 <= month <= 12):
-        return False
+    Finds the first differing character index between two strings.
+
+    Args:
+        line1 (str): The first string.
+        line2 (str): The second string.
+
+    Returns:
+        int: The index of the first character that differs.
+             Returns the length of the shorter string if one is a prefix of the other.
+             Returns -1 if the strings are identical.
+    """
+    shorter_len = min(len(line1), len(line2))
+    for idx in range(shorter_len):
+        if line1[idx] != line2[idx]:
+            return idx
     
-    # Check if the day is valid for the given month and year
-    days_in_the_month = days_in_month(year, month)
-    if not (1 <= day <= days_in_the_month):
-        return False
+    if len(line1) != len(line2):
+        return shorter_len
         
-    return True
+    return -1
 
-def days_between(year1, month1, day1, year2, month2, day2):
+def singleline_diff_format(line1, line2, idx):
     """
-    Takes two dates as input and returns the number of days between them.
-    Returns 0 if the second date is earlier than the first.
-    """
-    if not is_valid_date(year1, month1, day1) or \
-       not is_valid_date(year2, month2, day2):
-        return 0
-        
-    # If the second date is before the first, return 0.
-    # This fixes the bug where it returned 1 instead of 0.
-    if (year2, month2, day2) < (year1, month1, day1):
-        return 0
- 
-    days = 0
-    
-    # Create a mutable copy of the start date
-    current_year, current_month, current_day = year1, month1, day1
+    Formats the output for a single-line difference.
 
-    # Iterate day by day from the start date to the end date
-    while (current_year, current_month, current_day) < (year2, month2, day2):
-        days += 1
-        current_day += 1
-        
-        # Check if the month needs to be incremented
-        if current_day > days_in_month(current_year, current_month):
-            current_day = 1
-            current_month += 1
+    Args:
+        line1 (str): The first string.
+        line2 (str): The second string.
+        idx (int): The index of the first difference.
+
+    Returns:
+        str: A formatted string showing the difference, with a trailing newline.
+    """
+    if idx == -1:
+        return ""
+    return f"{line1}\n{'=' * idx}^\n{line2}\n"
+
+def multiline_diff(lines1, lines2):
+    """
+    Finds the first index where the lines in two lists of strings differ.
+
+    Args:
+        lines1 (list): The first list of strings.
+        lines2 (list): The second list of strings.
+
+    Returns:
+        tuple: A tuple (line_idx, char_idx) of the first difference.
+               Returns (-1, -1) if the files are identical.
+    """
+    shorter_len = min(len(lines1), len(lines2))
+    for line_idx in range(shorter_len):
+        char_idx = singleline_diff(lines1[line_idx], lines2[line_idx])
+        if char_idx != -1:
+            return (line_idx, char_idx)
             
-            # Check if the year needs to be incremented
-            if current_month > 12:
-                current_month = 1
-                current_year += 1
-                
-    return days
+    if len(lines1) != len(lines2):
+        return (shorter_len, 0)
 
-def age_in_days(year, month, day):
+    return (-1, -1)
+
+def file_diff_format(filename1, filename2):
     """
-    Takes a birthdate as input and returns the person's age in days
-    as of today.
+    Compares two files and formats the first difference found.
+
+    Args:
+        filename1 (str): The path to the first file.
+        filename2 (str): The path to the second file.
+
+    Returns:
+        str: A formatted string of the first difference, or "No differences found.\n".
     """
-    # Import the datetime module to get today's date
-    import datetime
-    today = datetime.date.today()
-    
-    # Get today's year, month, and day
-    today_year = today.year
-    today_month = today.month
-    today_day = today.day
-    
-    # Check for invalid birthdate or a birthdate in the future
-    if not is_valid_date(year, month, day) or \
-       (year, month, day) > (today_year, today_month, today_day):
-        return 0
-    
-    # Calculate the days between the birthdate and today
-    return days_between(year, month, day, today_year, today_month, today_day)
+    lines1 = get_file_lines(filename1)
+    lines2 = get_file_lines(filename2)
+    diff_indices = multiline_diff(lines1, lines2)
+    line_idx, char_idx = diff_indices
+
+    if line_idx == -1:
+        return "No differences\n"
+
+    # Handle case where one file has more lines than the other
+    line1 = lines1[line_idx] if line_idx < len(lines1) else ""
+    line2 = lines2[line_idx] if line_idx < len(lines2) else ""
+
+    header = f"Line {line_idx}:\n"
+    diff_format = singleline_diff_format(line1, line2, char_idx)
+    return header + diff_format
